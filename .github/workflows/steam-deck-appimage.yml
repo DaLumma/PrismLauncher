@@ -87,7 +87,9 @@ jobs:
             -D SDL_SHARED=OFF -D SDL_STATIC=ON \
             -D SDL_TESTS=OFF -D SDL_EXAMPLES=OFF -D SDL_INSTALL_TESTS=OFF \
             -D SDL_AUDIO=OFF -D SDL_VIDEO=OFF -D SDL_DIALOG=OFF \
-            -D SDL_DBUS=OFF -D SDL_IBUS=OFF
+            -D SDL_DBUS=OFF -D SDL_IBUS=OFF \
+            -D SDL_UNIX_CONSOLE_BUILD=ON \
+            -D SDL_INSTALL=ON
           cmake --build "$RUNNER_TEMP/sdl3-build"
           cmake --install "$RUNNER_TEMP/sdl3-build"
           echo "SDL3_DIR=$RUNNER_TEMP/sdl3/lib/cmake/SDL3" >> "$GITHUB_ENV"
