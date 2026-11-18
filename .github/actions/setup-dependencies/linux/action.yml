@@ -13,8 +13,7 @@ runs:
           dpkg-dev \
           ninja-build extra-cmake-modules pkg-config scdoc \
           gamemode-dev libxcb-cursor-dev \
-          libudev-dev \
-          autoconf autoconf-archive automake libtool libltdl-dev
+          libudev-dev
 
     - name: Setup AppImage tooling
       shell: bash

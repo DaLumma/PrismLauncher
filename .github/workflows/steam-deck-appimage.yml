@@ -68,11 +68,36 @@ jobs:
           artifact-name: Linux
           qt-version: 6.11.2
 
+      # SDL3 provides native gamepad support. It is built here (instead of through vcpkg) with only the
+      # joystick / gamepad subsystems, because vcpkg's SDL3 port pulls in D-Bus and all of systemd on Linux.
+      - name: Build SDL3 (gamepad support)
+        env:
+          SDL_VERSION: 3.2.26
+          SDL_SHA256: dad488474a51a0b01d547cd2834893d6299328d2e30f479a3564088b5476bae2
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/sdl3.tar.gz" \
+            "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL3-$SDL_VERSION.tar.gz"
+          echo "$SDL_SHA256  $RUNNER_TEMP/sdl3.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/sdl3.tar.gz" -C "$RUNNER_TEMP"
+
+          cmake -S "$RUNNER_TEMP/SDL3-$SDL_VERSION" -B "$RUNNER_TEMP/sdl3-build" -G Ninja \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_INSTALL_PREFIX="$RUNNER_TEMP/sdl3" \
+            -D CMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -D SDL_SHARED=OFF -D SDL_STATIC=ON \
+            -D SDL_TESTS=OFF -D SDL_EXAMPLES=OFF -D SDL_INSTALL_TESTS=OFF \
+            -D SDL_AUDIO=OFF -D SDL_VIDEO=OFF -D SDL_DIALOG=OFF \
+            -D SDL_DBUS=OFF -D SDL_IBUS=OFF
+          cmake --build "$RUNNER_TEMP/sdl3-build"
+          cmake --install "$RUNNER_TEMP/sdl3-build"
+          echo "SDL3_DIR=$RUNNER_TEMP/sdl3/lib/cmake/SDL3" >> "$GITHUB_ENV"
+
       - name: Configure project
         run: |
           cmake --preset "$CMAKE_PRESET" \
             -D VCPKG_HOST_TRIPLET="$VCPKG_TRIPLET" \
             -D VCPKG_TARGET_TRIPLET="$VCPKG_TRIPLET" \
+            -D SDL3_DIR="$SDL3_DIR" \
             -D Launcher_ENABLE_GAMEPAD=ON
 
       - name: Run build
