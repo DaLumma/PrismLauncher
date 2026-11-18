@@ -126,6 +126,17 @@ bool PageContainer::selectPage(QString pageId)
     return false;
 }
 
+void PageContainer::selectAdjacentPage(int delta)
+{
+    const int count = m_proxyModel->rowCount();
+    if (count <= 0 || delta == 0) {
+        return;
+    }
+    const int current = m_pageList->currentIndex().isValid() ? m_pageList->currentIndex().row() : 0;
+    const int next = ((current + delta) % count + count) % count;
+    m_pageList->setCurrentIndex(m_proxyModel->index(next, 0));
+}
+
 BasePage* PageContainer::getPage(QString pageId)
 {
     return m_model->findPageEntryById(pageId);

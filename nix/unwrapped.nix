@@ -10,6 +10,7 @@
   ninja,
   pkg-config,
   qrencode,
+  sdl3,
   self,
   stripJavaArchivesHook,
   tomlplusplus,
@@ -82,6 +83,7 @@ stdenv.mkDerivation {
     kdePackages.qtnetworkauth
     qrencode
     libarchive
+    sdl3
     tomlplusplus
     zlib
   ]

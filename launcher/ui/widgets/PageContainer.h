@@ -92,6 +92,9 @@ class PageContainer : public QWidget, public BasePageContainer {
 
     void hidePageList() { m_pageList->hide(); }
 
+    /// Select the page before (delta < 0) or after (delta > 0) the current one, wrapping around. Used for controller navigation.
+    void selectAdjacentPage(int delta);
+
    private:
     void createUI();
     void retranslate();

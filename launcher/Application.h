@@ -55,6 +55,7 @@ class LaunchController;
 class LocalPeer;
 class InstanceWindow;
 class MainWindow;
+class ControllerWindow;
 class ViewLogWindow;
 class GenericPageProvider;
 class QFile;
@@ -185,6 +186,14 @@ class Application : public QApplication {
 
     InstanceWindow* showInstanceWindow(MinecraftInstance* instance, const QString& page = QString());
     MainWindow* showMainWindow(bool minimized = false);
+    MainWindow* mainWindow() const { return m_mainWindow; }
+
+    /// Controller mode: the fullscreen, gamepad friendly interface (e.g. for the Steam Deck)
+    bool isControllerModeActive() const { return m_controllerMode; }
+    void setControllerMode(bool enabled);
+    ControllerWindow* controllerWindow() const { return m_controllerWindow; }
+    /// The window dialogs should be parented to (the controller window in controller mode, the main window otherwise)
+    QWidget* activeMainWidget() const;
     ViewLogWindow* showLogWindow();
 
     void updateIsRunning(bool running);
@@ -277,6 +286,13 @@ class Application : public QApplication {
 
     // main window, if any
     MainWindow* m_mainWindow = nullptr;
+
+    // controller mode
+    ControllerWindow* m_controllerWindow = nullptr;
+    bool m_controllerMode = false;
+    int m_controllerModeOverride = -1;  // -1: use the setting, 0: --desktop-mode, 1: --controller-mode
+    bool shouldStartInControllerMode() const;
+    void showControllerWindow();
 
     // log window, if any
     ViewLogWindow* m_viewLogWindow = nullptr;

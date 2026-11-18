@@ -11,6 +11,48 @@
   <br />This is a <b>fork</b> of the MultiMC Launcher and is <b>not</b> endorsed by it.
 </p>
 
+## Controller mode (Steam Deck)
+
+This fork adds a fullscreen, gamepad friendly interface ("controller mode") designed for the Steam Deck's 1280×800 screen,
+plus native gamepad navigation for every regular launcher dialog.
+
+**Installing on a Steam Deck**
+
+1. Download `PrismLauncher-Linux-x86_64.AppImage` from the `continuous` release (or from the artifacts of the
+   *Steam Deck AppImage* workflow in the Actions tab).
+2. In Desktop Mode, make it executable (right click → Properties → Permissions, or `chmod +x`).
+3. In Steam, *Add a Non-Steam Game* and pick the AppImage. Use the *Gamepad* controller layout.
+4. Start it from Game Mode. Controller mode opens automatically in Steam's Game Mode / Big Picture.
+
+You can also start it with `--controller-mode` (or `--desktop-mode`), switch from the desktop interface with
+*View → Controller Mode* (`Ctrl+Shift+G`), or press the View (⧉) button on a gamepad in the main window.
+
+**Controls**
+
+| Button             | Library                       | Menus & keyboard            |
+| ------------------ | ----------------------------- | --------------------------- |
+| D-pad / left stick | Move between instances        | Move                        |
+| A                  | Play (or manage running game) | Select / type               |
+| B                  | Clear search / leave          | Back / delete character     |
+| X                  | Instance options              | Space                       |
+| Y                  | Search                        | Shift                       |
+| L1 / R1            | Library / Accounts / Settings | Move text cursor            |
+| L2 / R2            | Switch instance group         | Symbols                     |
+| ☰ (Menu)           | Main menu                     | Done                        |
+| Right stick        | Scroll                        | Scroll                      |
+
+The *Accounts* section lets you sign in with a Microsoft account (scan the QR code with your phone) and choose the default
+account. The *Settings* section has the most important options (memory, startup mode, interface size, ...), with shortcuts to
+the full settings.
+
+Everything that isn't part of controller mode (creating instances, editing mods, ...) opens the regular dialogs, which can also be
+driven with the gamepad. The D-pad moves the focus (highlighted with a green frame), A activates, B goes back or closes, Y opens the
+on-screen keyboard for text fields, L1/R1 switch settings pages and L2/R2 switch tabs, X toggles (Space), ⧉ opens a context menu and ☰
+confirms the dialog.
+
+Gamepad support uses SDL3 (`Launcher_ENABLE_GAMEPAD`, enabled automatically when SDL3 is found). Builds without SDL3 still have
+controller mode, driven by the keyboard (arrows, Enter, Escape, Tab, Page Up/Down, F10) or Steam Input keyboard bindings.
+
 ## Installation
 
 - All downloads and instructions for Prism Launcher can be found on our [Website](https://prismlauncher.org/download).

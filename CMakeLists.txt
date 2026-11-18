@@ -351,6 +351,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
+# Find SDL3, used for native gamepad support (controller mode / Steam Deck)
+find_package(SDL3 CONFIG QUIET)
+option(Launcher_ENABLE_GAMEPAD "Enable native gamepad support through SDL3" ${SDL3_FOUND})
+if(Launcher_ENABLE_GAMEPAD AND NOT SDL3_FOUND)
+    message(FATAL_ERROR "Launcher_ENABLE_GAMEPAD is enabled, but SDL3 was not found")
+endif()
+if(Launcher_ENABLE_GAMEPAD)
+    message(STATUS "Native gamepad support enabled (SDL3 ${SDL3_VERSION})")
+else()
+    message(STATUS "Native gamepad support disabled (SDL3 not found)")
+endif()
+
 # Find libqrencode
 ## NOTE(@getchoo): Never use pkg-config with MSVC since the vcpkg port makes our install bundle fail to find the dll
 if(MSVC)

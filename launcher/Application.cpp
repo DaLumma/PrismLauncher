@@ -50,6 +50,8 @@
 #include "tools/GenericProfiler.h"
 #include "ui/InstanceWindow.h"
 #include "ui/MainWindow.h"
+#include "ui/controller/ControllerNavigator.h"
+#include "ui/controller/ControllerWindow.h"
 #include "ui/ToolTipFilter.h"
 #include "ui/ViewLogWindow.h"
 
@@ -329,7 +331,9 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
           { "alive", "Write a small '" + g_liveCheckFile + "' file after the launcher starts" },
           { "show-window", "Show the main launcher window (useful in combination with --launch)" },
           { { "I", "import" }, "Import instance or resource from specified local path or URL", "url" },
-          { "show", "Opens the window for the specified instance (by instance ID)", "show" } });
+          { "show", "Opens the window for the specified instance (by instance ID)", "show" },
+          { "controller-mode", "Start in controller mode (fullscreen interface for gamepads, e.g. on the Steam Deck)" },
+          { "desktop-mode", "Start in the regular desktop interface, even if controller mode is enabled" } });
     // Has to be positional for some OS to handle that properly
     parser.addPositionalArgument("URL", "Import the resource(s) at the given URL(s) (same as -I / --import)", "[URL...]");
 
@@ -350,6 +354,11 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
 
     m_instanceIdToShowWindowOf = parser.value("show");
     m_showMainWindow = parser.isSet("show-window");
+    if (parser.isSet("controller-mode")) {
+        m_controllerModeOverride = 1;
+    } else if (parser.isSet("desktop-mode")) {
+        m_controllerModeOverride = 0;
+    }
 
     for (const auto& url : parser.values("import")) {
         m_urlsToImport.append(normalizeImportUrl(url));
@@ -897,6 +906,14 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         m_settings->registerSetting("CloseAfterLaunch", false);
         m_settings->registerSetting("QuitAfterGameStop", false);
 
+        // Controller mode (Steam Deck friendly interface)
+        // "auto": when running in Steam's Game Mode / Big Picture, "always" or "never"
+        m_settings->registerSetting("ControllerModeStartup", "auto");
+        m_settings->registerSetting("ControllerUiScale", 100);
+        m_settings->registerSetting("ControllerFullscreen", true);
+        // use gamepads to navigate the regular desktop interface too
+        m_settings->registerSetting("GamepadNavigation", true);
+
         m_settings->registerSetting("Env", "{}");
 
         m_settings->registerSetting("WorldTools", "{}");
@@ -1236,6 +1253,9 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         installEventFilter(new ToolTipFilter);
     }
 
+    // gamepad support, for controller mode and for navigating regular dialogs
+    ControllerNavigator::instance()->startGamepadInput();
+
     // the setup wizard applies the selected theme itself before it is shown
     if (!createSetupWizard()) {
         m_themeManager->applyCurrentlySelectedTheme(true);
@@ -1415,9 +1435,10 @@ void Application::performMainStartupAction()
         }
     }
     if (!m_mainWindow) {
-        // normal main window
+        m_controllerMode = shouldStartInControllerMode();
+        // normal main window (stays hidden in controller mode)
         showMainWindow(false);
-        qDebug() << "<> Main window shown.";
+        qDebug() << (m_controllerMode ? "<> Controller mode shown." : "<> Main window shown.");
     }
 
     // initialize the updater
@@ -1587,8 +1608,8 @@ bool Application::launch(MinecraftInstance* instance,
         controller->setOfflineName(offlineName);
         if (instance->window() != nullptr) {
             controller->setParentWidget(instance->window());
-        } else if (m_mainWindow != nullptr) {
-            controller->setParentWidget(m_mainWindow);
+        } else if (activeMainWidget() != nullptr) {
+            controller->setParentWidget(activeMainWidget());
         }
         connect(controller, &LaunchController::finished, this, &Application::controllerFinished);
         addRunningInstance();
@@ -1701,6 +1722,10 @@ void Application::ShowGlobalSettings(class QWidget* parent, QString openPage)
 MainWindow* Application::showMainWindow(bool minimized)
 {
     if (m_mainWindow) {
+        if (m_controllerMode) {
+            showControllerWindow();
+            return m_mainWindow;
+        }
         m_mainWindow->setWindowState(m_mainWindow->windowState() & ~Qt::WindowMinimized);
         m_mainWindow->raise();
         m_mainWindow->activateWindow();
@@ -1709,7 +1734,10 @@ MainWindow* Application::showMainWindow(bool minimized)
         m_mainWindow->restoreState(QByteArray::fromBase64(APPLICATION->settings()->get("MainWindowState").toString().toUtf8()));
         m_mainWindow->restoreGeometry(QByteArray::fromBase64(APPLICATION->settings()->get("MainWindowGeometry").toString().toUtf8()));
 
-        if (minimized) {
+        if (m_controllerMode) {
+            // the main window stays hidden behind the controller interface
+            showControllerWindow();
+        } else if (minimized) {
             m_mainWindow->showMinimized();
         } else {
             m_mainWindow->show();
@@ -1719,11 +1747,74 @@ MainWindow* Application::showMainWindow(bool minimized)
         connect(this, &Application::updateAllowedChanged, m_mainWindow, &MainWindow::updatesAllowedChanged);
         connect(m_mainWindow, &MainWindow::isClosing, this, [this] {
             m_mainWindow = nullptr;
+            if (m_controllerWindow) {
+                m_controllerWindow->closeForModeSwitch();
+            }
             on_windowClose();
         });
         m_openWindows++;
     }
     return m_mainWindow;
+}
+
+bool Application::shouldStartInControllerMode() const
+{
+    if (m_controllerModeOverride >= 0) {
+        return m_controllerModeOverride == 1;
+    }
+    const QString mode = m_settings->get("ControllerModeStartup").toString();
+    if (mode == "always") {
+        return true;
+    }
+    if (mode == "never") {
+        return false;
+    }
+    // "auto": Steam's Game Mode (gamescope session) or Big Picture mode
+    return qEnvironmentVariable("XDG_CURRENT_DESKTOP") == "gamescope" || qEnvironmentVariable("SteamGamepadUI") == "1" ||
+           qEnvironmentVariable("SteamTenfoot") == "1";
+}
+
+QWidget* Application::activeMainWidget() const
+{
+    if (m_controllerMode && m_controllerWindow) {
+        return m_controllerWindow;
+    }
+    return m_mainWindow;
+}
+
+void Application::showControllerWindow()
+{
+    if (!m_controllerWindow) {
+        m_controllerWindow = new ControllerWindow();
+        connect(m_controllerWindow, &QObject::destroyed, this, [this] { m_controllerWindow = nullptr; });
+    }
+    m_controllerWindow->showWindow();
+}
+
+void Application::setControllerMode(bool enabled)
+{
+    m_controllerMode = enabled;
+    if (enabled) {
+        if (!m_mainWindow) {
+            showMainWindow(false);
+            return;
+        }
+        showControllerWindow();
+        m_mainWindow->hide();
+        return;
+    }
+
+    if (m_controllerWindow) {
+        m_controllerWindow->closeForModeSwitch();
+    }
+    if (!m_mainWindow) {
+        showMainWindow(false);
+        return;
+    }
+    m_mainWindow->show();
+    m_mainWindow->setWindowState(m_mainWindow->windowState() & ~Qt::WindowMinimized);
+    m_mainWindow->raise();
+    m_mainWindow->activateWindow();
 }
 
 ViewLogWindow* Application::showLogWindow()
@@ -1771,7 +1862,7 @@ InstanceWindow* Application::showInstanceWindow(MinecraftInstance* instance, con
         connect(window, &InstanceWindow::isClosing, this, [this, instance] {
             instance->setWindow(nullptr);
             if (instance->launchController() != nullptr) {
-                instance->launchController()->setParentWidget(m_mainWindow);
+                instance->launchController()->setParentWidget(activeMainWidget());
             }
             on_windowClose();
         });

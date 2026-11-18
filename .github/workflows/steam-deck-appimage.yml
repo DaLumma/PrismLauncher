@@ -1,0 +1,156 @@
+name: Steam Deck AppImage
+
+# Builds the x86_64 Linux AppImage (the format used on the Steam Deck) on every push,
+# and publishes builds of the default branch as the "continuous" GitHub release.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - "**"
+    paths-ignore:
+      - "**.md"
+      - "**/LICENSE"
+      - "flake.lock"
+      - "**.nix"
+      - "renovate.json"
+      - ".github/ISSUE_TEMPLATE/**"
+  workflow_dispatch:
+    inputs:
+      build-type:
+        description: Type of build (Debug or Release)
+        type: choice
+        options:
+          - Release
+          - Debug
+        default: Release
+      publish:
+        description: Publish the AppImage as the "continuous" release
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  appimage:
+    name: Build AppImage (x86_64)
+
+    permissions:
+      contents: read
+      # Required for the vcpkg binary cache
+      packages: write
+
+    runs-on: ubuntu-24.04
+
+    env:
+      ARTIFACT_NAME: Linux-Qt6
+      BUILD_PLATFORM: official
+      BUILD_TYPE: ${{ inputs.build-type || 'Release' }}
+      CMAKE_PRESET: ci
+
+    outputs:
+      version: ${{ steps.short-version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Setup dependencies
+        id: setup-dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          build-type: ${{ env.BUILD_TYPE }}
+          artifact-name: Linux
+          qt-version: 6.11.2
+
+      - name: Configure project
+        run: |
+          cmake --preset "$CMAKE_PRESET" \
+            -D VCPKG_HOST_TRIPLET="$VCPKG_TRIPLET" \
+            -D VCPKG_TARGET_TRIPLET="$VCPKG_TRIPLET" \
+            -D Launcher_ENABLE_GAMEPAD=ON
+
+      - name: Run build
+        run: |
+          cmake --build --preset "$CMAKE_PRESET" --config "$BUILD_TYPE"
+
+      - name: Run tests
+        run: |
+          ctest --preset "$CMAKE_PRESET" --build-config "$BUILD_TYPE"
+
+      - name: Get short version
+        id: short-version
+        run: |
+          echo "version=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Package
+        uses: ./.github/actions/package/linux
+        with:
+          version: ${{ steps.short-version.outputs.version }}
+          build-type: ${{ steps.setup-dependencies.outputs.build-type }}
+          artifact-name: Linux
+          qt-version: ${{ steps.setup-dependencies.outputs.qt-version }}
+          stable-name: "true"
+
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-private-key-id: ${{ secrets.GPG_PRIVATE_KEY_ID }}
+
+      - name: Summary
+        run: |
+          {
+            echo "## Steam Deck AppImage"
+            echo
+            echo "Download the \`PrismLauncher-Linux-...-x86_64.AppImage\` artifact from this run, then on the Steam Deck:"
+            echo
+            echo "1. In Desktop Mode, make it executable (\`chmod +x PrismLauncher-Linux-x86_64.AppImage\`)."
+            echo "2. Add it to Steam as a non-Steam game."
+            echo "3. Start it from Game Mode: controller mode opens automatically."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish continuous release
+    needs: appimage
+    if: >-
+      (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
+
+    permissions:
+      contents: write
+
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download AppImage
+        uses: actions/download-artifact@v8
+        with:
+          pattern: PrismLauncher-Linux-*-x86_64.AppImage*
+          merge-multiple: true
+          path: dist
+
+      - name: Update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: continuous
+          VERSION: ${{ needs.appimage.outputs.version }}
+        run: |
+          ls -la dist
+
+          NOTES="Automatic build of \`${GITHUB_SHA::7}\` from \`${GITHUB_REF_NAME}\` with the controller (Steam Deck) interface.
+
+          **Steam Deck:** download \`PrismLauncher-Linux-x86_64.AppImage\`, make it executable, add it to Steam as a non-Steam game and start it from Game Mode."
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # move the tag to the new commit
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/$TAG" -f sha="$GITHUB_SHA" -F force=true
+            gh release edit "$TAG" --title "Continuous build ($VERSION)" --notes "$NOTES" --latest
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Continuous build ($VERSION)" --notes "$NOTES" --latest
+          fi
+
+          gh release upload "$TAG" dist/* --clobber

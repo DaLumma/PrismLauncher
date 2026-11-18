@@ -252,6 +252,16 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
             ui->mainToolBar->addAction(ui->actionCloseWindow);
         }
 
+        // switch to the fullscreen controller interface (also reachable with the View / Select button of a gamepad)
+        auto* controllerModeAction = new QAction(QIcon::fromTheme("launch"), tr("Controller Mode"), this);
+        controllerModeAction->setToolTip(tr("Switch to the fullscreen, gamepad friendly interface (e.g. for the Steam Deck)"));
+        controllerModeAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
+        connect(controllerModeAction, &QAction::triggered, this, [] { APPLICATION->setControllerMode(true); });
+        ui->viewMenu->addAction(controllerModeAction);
+        if (qgetenv("XDG_CURRENT_DESKTOP") == "gamescope" || qgetenv("SteamDeck") == "1") {
+            ui->mainToolBar->addAction(controllerModeAction);
+        }
+
         ui->actionViewJavaFolder->setEnabled(BuildConfig.JAVA_DOWNLOADER_ENABLED);
     }
 

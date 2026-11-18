@@ -813,6 +813,36 @@ SET(LAUNCHER_SOURCES
     ui/ViewLogWindow.h
     ui/ViewLogWindow.cpp
 
+    # GUI - controller mode (Steam Deck)
+    ui/controller/ControllerAction.h
+    ui/controller/GamepadInput.h
+    ui/controller/GamepadInput.cpp
+    ui/controller/ControllerNavigator.h
+    ui/controller/ControllerNavigator.cpp
+    ui/controller/ControllerStyle.h
+    ui/controller/ControllerStyle.cpp
+    ui/controller/ControllerHintBar.h
+    ui/controller/ControllerHintBar.cpp
+    ui/controller/ControllerChipBar.h
+    ui/controller/ControllerChipBar.cpp
+    ui/controller/ControllerListDelegate.h
+    ui/controller/ControllerListDelegate.cpp
+    ui/controller/ControllerOverlay.h
+    ui/controller/ControllerOverlay.cpp
+    ui/controller/ControllerMenu.h
+    ui/controller/ControllerMenu.cpp
+    ui/controller/ControllerKeyboard.h
+    ui/controller/ControllerKeyboard.cpp
+    ui/controller/ControllerPage.h
+    ui/controller/ControllerLibraryPage.h
+    ui/controller/ControllerLibraryPage.cpp
+    ui/controller/ControllerAccountsPage.h
+    ui/controller/ControllerAccountsPage.cpp
+    ui/controller/ControllerSettingsPage.h
+    ui/controller/ControllerSettingsPage.cpp
+    ui/controller/ControllerWindow.h
+    ui/controller/ControllerWindow.cpp
+
     # GUI - utilities
     ui/GuiUtil.h
     ui/GuiUtil.cpp
@@ -1258,6 +1288,11 @@ if(TARGET PkgConfig::libarchive)
     target_link_libraries(Launcher_logic PkgConfig::libarchive)
 else()
     target_link_libraries(Launcher_logic LibArchive::LibArchive)
+endif()
+
+if (Launcher_ENABLE_GAMEPAD)
+    target_link_libraries(Launcher_logic SDL3::SDL3)
+    target_compile_definitions(Launcher_logic PRIVATE PRISM_HAS_SDL3)
 endif()
 
 if (Launcher_ENABLE_GAMEMODE)
