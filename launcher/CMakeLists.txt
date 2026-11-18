@@ -1292,7 +1292,8 @@ endif()
 
 if (Launcher_ENABLE_GAMEPAD)
     target_link_libraries(Launcher_logic SDL3::SDL3)
-    target_compile_definitions(Launcher_logic PRIVATE PRISM_HAS_SDL3)
+    # Must be public, the precompiled header is shared with the launcher executable
+    target_compile_definitions(Launcher_logic PUBLIC PRISM_HAS_SDL3)
 endif()
 
 if (Launcher_ENABLE_GAMEMODE)
